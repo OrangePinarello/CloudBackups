@@ -70,6 +70,11 @@
 ;#      dump images where saved without modification on premise.
 ;#
 ;#
+;#   Version 1.2     TMM   11/16/2015
+;#
+;#      Call the shell script StartVOSdumpSlicing.sh to take the VOS dump files and slice them up
+;#      and add them to the Object Store
+;#
 ;#
 ;#
 ;#
@@ -105,6 +110,7 @@ else {
 
     system ("/afs/nd.edu/user7/sysadmin/Private/AFS/AFS_tools/CloudBackups/cloud_dumpdb.pl -q");
 
+    system ("/afs/nd.edu/user7/sysadmin/Private/AFS/AFS_tools/CloudBackups/StartVOSdumpSlicing.sh");
 
     system ("/usr/bin/unlog >$STDout 2>$STDerr");
     system ("/usr/bin/kdestroy >$STDout 2>$STDerr");
