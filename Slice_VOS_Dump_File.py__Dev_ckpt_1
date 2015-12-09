@@ -762,7 +762,6 @@ if __name__ == "__main__":
     #   It is keyed by the file(s) byte offset location within the vos dump image
     file_annotation = {}
 
-
     ###   These dictionaries are keyed by the checksum_key   (sha1_value, md5_value, slice_length)
 
     #   This dictionary stores the mapping of the checksum_key to the slice number(s) where those keys are used
@@ -775,7 +774,7 @@ if __name__ == "__main__":
     was_created_keyed_by_checksum = {}
 
     #   This dictionary has the information about which slices need to be created.  Note that this is the same data
-    #   as is stored in the dictionary  create_this_slice   Just using different look up keys
+    #   as is stored in the dictionary  create_this_slice   Just using differnt look up keys
     need_to_create = {}
 
 
@@ -996,41 +995,11 @@ if __name__ == "__main__":
 
     StartMultipleSubProcesses('Calculate_Slice_Checksum', len(list_of_items_to_write), queue_count, queue_depth)
 
-    dumped_file_names = {}             #  Not needed any more save memory and initialize to empty
+
+    dumped_file_names = {}
+    checksum_2_slice_numbers = {}
     slice_info_file_fh.close()
     number_of_slices = slice_number
-
-
-
-
-    ###   TMM   this is the processing of the information returned the "calculate slice cheksum"
-
-    for item_identifier, returned_record in dict_of_items_read_from_queue.iteritems():
-        record = returned_record.split(' :: ')
-        sha1_value = record[0]
-        md5_value = record[1]
-        slice_file_size = int(record[2])
-        slice_offset = int(record[3])
-        slice_number = int(record[4])
-
-        #  Yes the checksum_key is going to be a very long string varying between 84 and 86 characters
-        #      SHA1 - 40 characters     MD5 - 32 characters     Slice length - between 4 and 6 digits     Two delimiters - 8 charactes
-        checksum_key = sha1_value + ' :: ' + md5_value + ' :: ' + str(slice_file_size)
-        temp_slice_record = checksum_key + ' :: ' + str(slice_offset)
-        slice_list = []
-
-        if checksum_2_slice_numbers.has_key(checksum_key):
-            duplicate_checksum_keyed_by_slice_number[int(slice_number)] = str(temp_slice_record)
-            slice_list = checksum_2_slice_numbers.get(checksum_key)
-        else:
-            unique_checksum_keyed_by_slice_number[int(slice_number)] = str(temp_slice_record)
-
-        slice_list.append(str(slice_number))
-        checksum_2_slice_numbers[checksum_key] = slice_list
-
-    checksum_2_slice_numbers = {}             #  Not needed any more save memory and initialize to empty
-        
-
 
 
     #  For the unique slices see if any of them already exist within the object store
@@ -1108,9 +1077,7 @@ if __name__ == "__main__":
                     sys.exit(1)
 
 
-    unique_checksum_keyed_by_slice_number = {}             #  Not needed any more save memory and initialize to empty
-
-
+    unique_checksum_keyed_by_slice_number = {}
 
     #  For the duplicate slices see if any of them already exist within the object store
     #
@@ -1169,7 +1136,7 @@ if __name__ == "__main__":
                     print 'ERROR:  Suppose to be a duplicate slice   so it should already be listed as needing to be created\n'
                     sys.exit(1)
 
-    need_to_create = {}           #  Not needed any more save memory and initialize to empty
+    need_to_create = {}
 
 
     load_two_lists_processing_start_time = time.time()
@@ -1194,51 +1161,9 @@ if __name__ == "__main__":
 
 
 
-    create_this_slice = {}         #  Not needed any more save memory and initialize to empty
+    create_this_slice = {}
 
     StartMultipleSubProcesses('Create_Slice', len(list_of_items_to_write), queue_count, queue_depth)
-
-
-
-
-
-
-    ### TMM   this is the processing of the information returned the "create slice"
-
-    for item_identifier, returned_record in dict_of_items_read_from_queue.iteritems():
-        record = returned_record.split(' :: ')
-
-        sha1_value = record[0]
-        md5_value = record[1]
-        slice_file_size = int(record[2])
-        encrypted_file_size = int(record[3])
-        slice_file_block_cnt = int(record[4])
-        encrypted_file_block_cnt = int(record[5])
-        slice_offset = int(record[6])
-        slice_number = int(record[7])
-        status = record[8]
-        slice_name = record[9]
-
-        #  Create a record for the slice that was just processed to be placed into the database for this vos dump 
-        checksum_key = sha1_value + ' :: ' + md5_value + ' :: ' + str(slice_file_size)
-
-        if file_annotation.has_key(str(slice_offset)):
-            returned_record = returned_record + ' :: ' + str(file_annotation[str(slice_offset)])
-
-        was_created_keyed_by_slice_number[slice_number] = returned_record
-
-        #  Create the initial record within the all slice database for this newly created slice 
-        link_count = 1
-        part_1 = str(encrypted_file_size) + ' :: ' + str(slice_file_block_cnt) + ' :: ' + str(encrypted_file_block_cnt)
-        db_record = part_1 + ' :: ' + slice_name + ' :: ' + str(link_count)
-
-        was_created_keyed_by_checksum[checksum_key] = db_record
-
-
-
-
-
-
 
 
     #  For the duplicate slices that have NOT already been identified within the dictionary  already_have_slice

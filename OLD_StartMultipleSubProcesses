@@ -1,0 +1,1006 @@
+#  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==
+#
+#
+#
+#  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==  ==
+
+def  OLD_StartMultipleSubProcesses(subprocess_name):
+
+    global  debug_on
+    global  input_file_path
+    global  object_store
+    global  sodium
+    global  queue_count
+    global  queue_depth
+    global  list_of_slice_numbers
+    global  list_of_slice_offsets
+    global  list_of_slice_lengths
+    global  list_of_slice_info
+
+
+    
+    global  spawn_CalculateSliceChecksum_processing_start_time
+    global  spawn_CreateSlice_processing_start_time
+    global  calculate_checksums_processing_start_time
+    global  creating_slices_processing_start_time
+    global  waiting_on_last_slices_to_calculate_processing_start_time
+    global  waiting_on_last_slices_to_create_processing_start_time
+    global  stop_CalculateChecksum_processing_start_time
+    global  stop_CreateSlice_processing_start_time
+
+    global  checksum_2_slice_numbers
+    global  duplicate_checksum_keyed_by_slice_number
+    global  unique_checksum_keyed_by_slice_number
+
+    global  was_created_keyed_by_checksum
+    global  was_created_keyed_by_slice_number
+    global  file_annotation
+
+    global  CalculateChecksum
+    global  CreateSlice
+
+
+    flag_CalculateChecksum = False
+    flag_CreateSlice = False
+
+    if subprocess_name  ==  'Calculate_Slice_Checksum':
+        flag_CalculateChecksum = True
+        spawn_CalculateSliceChecksum_processing_start_time = time.time()
+        if debug_on:
+            print 'Spawn the  Calculate_Slice_Checksum  subprocesses...\n'
+
+    elif subprocess_name  ==  'Create_Slice':
+        flag_CreateSlice = True
+        spawn_CreateSlice_processing_start_time = time.time()
+        if debug_on:
+            print 'Spawn the  Create_Slice  subprocesses...\n'
+
+    else:
+        print 'ERROR:  ' + subprocess_name +  '  is an unknown subprocess name\n'
+        sys.exit(1)
+
+
+    proc1_write_count = 0
+    proc2_write_count = 0
+    proc3_write_count = 0
+    proc4_write_count = 0
+    proc5_write_count = 0
+    proc6_write_count = 0
+    proc7_write_count = 0
+    proc8_write_count = 0
+
+    flag_proc1_enabled = False
+    flag_proc2_enabled = False
+    flag_proc3_enabled = False
+    flag_proc4_enabled = False
+    flag_proc5_enabled = False
+    flag_proc6_enabled = False
+    flag_proc7_enabled = False
+    flag_proc8_enabled = False
+
+    number_of_slices_to_process = len(list_of_slice_numbers)
+
+    if flag_CalculateChecksum:
+        # if doing a checksum calculation force that process to be done with 8 threads and a queue depth of 3000
+        subprocess_thread_count = 8
+        write_queue_depth = 3000
+
+        flag_proc1_enabled = True
+        flag_proc2_enabled = True
+        flag_proc3_enabled = True
+        flag_proc4_enabled = True
+        flag_proc5_enabled = True
+        flag_proc6_enabled = True
+        flag_proc7_enabled = True
+        flag_proc8_enabled = True
+    else:
+        # Assign the number of threads and the depth of the processing queues
+        subprocess_thread_count = queue_count
+        write_queue_depth = queue_depth
+
+        flag_proc1_enabled = True
+        if subprocess_thread_count >= 2:
+            flag_proc2_enabled = True
+        if subprocess_thread_count >= 3:
+            flag_proc3_enabled = True
+        if subprocess_thread_count >= 4:
+            flag_proc4_enabled = True
+        if subprocess_thread_count >= 5:
+            flag_proc5_enabled = True
+        if subprocess_thread_count >= 6:
+            flag_proc6_enabled = True
+        if subprocess_thread_count >= 7:
+            flag_proc7_enabled = True
+            if subprocess_thread_count == 8:
+                flag_proc8_enabled = True
+            else:
+                print 'ERROR:  To many threads (queues) are being specified the max value is 8\n'
+                sys.exit(1)
+
+    MAX_QUEUED = write_queue_depth * subprocess_thread_count
+
+
+    #  Configure the number of threads (subprocess) that will be used slice up the vos dump image
+    #
+    if flag_proc1_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc1 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc1 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc1 = Queue()
+        t_proc1 = Thread(target=enqueue_output, args=(slicer_proc1.stdout, q_proc1))
+        t_proc1.daemon = True
+        t_proc1.start()
+
+    if flag_proc2_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc2 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc2 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc2 = Queue()
+        t_proc2 = Thread(target=enqueue_output, args=(slicer_proc2.stdout, q_proc2))
+        t_proc2.daemon = True
+        t_proc2.start()
+
+    if flag_proc3_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc3 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc3 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc3 = Queue()
+        t_proc3 = Thread(target=enqueue_output, args=(slicer_proc3.stdout, q_proc3))
+        t_proc3.daemon = True
+        t_proc3.start()
+
+    if flag_proc4_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc4 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc4 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc4 = Queue()
+        t_proc4 = Thread(target=enqueue_output, args=(slicer_proc4.stdout, q_proc4))
+        t_proc4.daemon = True
+        t_proc4.start()
+
+    if flag_proc5_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc5 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc5 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc5 = Queue()
+        t_proc5 = Thread(target=enqueue_output, args=(slicer_proc5.stdout, q_proc5))
+        t_proc5.daemon = True
+        t_proc5.start()
+
+    if flag_proc6_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc6 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc6 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc6 = Queue()
+        t_proc6 = Thread(target=enqueue_output, args=(slicer_proc6.stdout, q_proc6))
+        t_proc6.daemon = True
+        t_proc6.start()
+
+    if flag_proc7_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc7 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc7 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+
+        q_proc7 = Queue()
+        t_proc7 = Thread(target=enqueue_output, args=(slicer_proc7.stdout, q_proc7))
+        t_proc7.daemon = True
+        t_proc7.start()
+
+    if flag_proc8_enabled:
+        if flag_CalculateChecksum:
+            slicer_proc8 = Popen([CalculateChecksum , "--file" , input_file_path], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+        elif flag_CreateSlice:
+            slicer_proc8 = Popen([CreateSlice , "--file" , input_file_path , "--obj" , object_store , "--salt" , sodium], stdin = PIPE, stdout = PIPE, stderr = PIPE, bufsize=1, close_fds=ON_POSIX, shell = False)
+ 
+        q_proc8 = Queue()
+        t_proc8 = Thread(target=enqueue_output, args=(slicer_proc8.stdout, q_proc8))
+        t_proc8.daemon = True
+        t_proc8.start()
+
+
+    current_write_count = 0
+    list_of_records = []
+
+
+    #  Now go and create the slices that have been identified as needing to be created  (dictionary:  create_this_slice)
+    #
+    #  After the slice file has been created then save its information  (dictionary:  was_created_keyed_by_slice_number)
+    #
+    #  Also identify new records to will need to be added to the All Slice database  (dictionary:  was_created_keyed_by_checksum)
+
+
+    if flag_CalculateChecksum:
+        calculate_checksums_processing_start_time = time.time()
+        if debug_on:
+            print 'Start calculating checksums for  ' + str(number_of_slices_to_process) + '  slices...\n'
+
+    if flag_CreateSlice:
+        creating_slices_processing_start_time = time.time()
+        if debug_on:
+            print 'Start creating  ' + str(number_of_slices_to_process) + '  slices...\n'
+
+    while number_of_slices_to_process  >  0:
+        if current_write_count  !=  MAX_QUEUED:
+            #  Process is available to process the current slice
+            send_slice_info = ''
+
+            if flag_proc1_enabled:
+                while number_of_slices_to_process  >  0  and  proc1_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc1_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc1.stdin.write(send_slice_info)
+                        slicer_proc1.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc2_enabled:
+                while number_of_slices_to_process  >  0  and  proc2_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc2_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc2.stdin.write(send_slice_info)
+                        slicer_proc2.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc3_enabled:
+                while number_of_slices_to_process  >  0  and  proc3_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc3_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc3.stdin.write(send_slice_info)
+                        slicer_proc3.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc4_enabled:
+                while number_of_slices_to_process  >  0  and  proc4_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc4_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc4.stdin.write(send_slice_info)
+                        slicer_proc4.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc5_enabled:
+                while number_of_slices_to_process  >  0  and  proc5_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc5_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc5.stdin.write(send_slice_info)
+                        slicer_proc5.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc6_enabled:
+                while number_of_slices_to_process  >  0  and  proc6_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc6_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc6.stdin.write(send_slice_info)
+                        slicer_proc6.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc7_enabled:
+                while number_of_slices_to_process  >  0  and  proc7_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc7_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc7.stdin.write(send_slice_info)
+                        slicer_proc7.stdin.flush()
+                        send_slice_info = ''
+
+            if flag_proc8_enabled:
+                while number_of_slices_to_process  >  0  and  proc8_write_count < write_queue_depth  and  current_write_count  !=  MAX_QUEUED:
+                    if flag_CalculateChecksum:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_offset = list_of_slice_offsets.pop(0)
+                        slice_length = list_of_slice_lengths.pop(0)
+                        send_slice_info = send_slice_info + str(slice_number) + ' :: ' +  str(slice_offset) + ' :: ' +  str(slice_length) + '\n'
+                    elif flag_CreateSlice:
+                        slice_number = list_of_slice_numbers.pop(0)
+                        slice_info = list_of_slice_info.pop(0)
+                        record = slice_info.split(' :: ')
+                        checksum_key = record[0] + ' :: ' + record[1] + ' :: ' + record[2]           
+                        send_slice_info = send_slice_info + str(slice_info) + ' :: ' +  str(slice_number) + '\n'
+
+                    proc8_write_count += 1
+                    current_write_count += 1
+                    number_of_slices_to_process -= 1
+                else:
+                    if send_slice_info:
+                        slicer_proc8.stdin.write(send_slice_info)
+                        slicer_proc8.stdin.flush()
+                        send_slice_info = ''
+
+
+            #  See if any database records are in the stack that need to be processed
+
+            while len(list_of_records)  !=  0:
+                returned_record = list_of_records.pop(0)
+                record = returned_record.split(' :: ')
+
+                if flag_CalculateChecksum:
+                    sha1_value = record[0]
+                    md5_value = record[1]
+                    slice_file_size = int(record[2])
+                    slice_offset = int(record[3])
+                    slice_number = int(record[4])
+
+                    #  Yes the checksum_key is going to be a very long string varying between 84 and 86 characters
+                    #      SHA1 - 40 characters     MD5 - 32 characters     Slice length - between 4 and 6 digits     Two delimiters - 8 charactes
+                    checksum_key = sha1_value + ' :: ' + md5_value + ' :: ' + str(slice_file_size)
+                    temp_slice_record = checksum_key + ' :: ' + str(slice_offset)
+                    slice_list = []
+
+                    if checksum_2_slice_numbers.has_key(checksum_key):
+                        duplicate_checksum_keyed_by_slice_number[int(slice_number)] = str(temp_slice_record)
+                        slice_list = checksum_2_slice_numbers.get(checksum_key)
+                    else:
+                        unique_checksum_keyed_by_slice_number[int(slice_number)] = str(temp_slice_record)
+
+                    slice_list.append(str(slice_number))
+                    checksum_2_slice_numbers[checksum_key] = slice_list
+                elif flag_CreateSlice:
+                    sha1_value = record[0]
+                    md5_value = record[1]
+                    slice_file_size = int(record[2])
+                    encrypted_file_size = int(record[3])
+                    slice_file_block_cnt = int(record[4])
+                    encrypted_file_block_cnt = int(record[5])
+                    slice_offset = int(record[6])
+                    slice_number = int(record[7])
+                    status = record[8]
+                    slice_name = record[9]
+
+                    #  Create a record for the slice that was just processed to be placed into the database for this vos dump 
+                    checksum_key = sha1_value + ' :: ' + md5_value + ' :: ' + str(slice_file_size)
+
+                    if file_annotation.has_key(str(slice_offset)):
+                        returned_record = returned_record + ' :: ' + str(file_annotation[str(slice_offset)])
+
+                    was_created_keyed_by_slice_number[slice_number] = returned_record
+
+                    #  Create the initial record within the all slice database for this newly created slice 
+                    link_count = 1
+                    part_1 = str(encrypted_file_size) + ' :: ' + str(slice_file_block_cnt) + ' :: ' + str(encrypted_file_block_cnt)
+                    db_record = part_1 + ' :: ' + slice_name + ' :: ' + str(link_count)
+
+                    was_created_keyed_by_checksum[checksum_key] = db_record
+
+
+            #  Check on the subprocesses wait on them until they have something to read
+            #
+            flag_waiting_to_read = True
+            previous_write_count = current_write_count
+
+            while flag_waiting_to_read:
+                if previous_write_count  !=  current_write_count:
+                    #  One subprocess had something which we read, take one more pass thur to find any others
+                    flag_waiting_to_read = False
+
+                if flag_proc1_enabled:
+                    while proc1_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc1.get_nowait()
+                        try:  returned_record = q_proc1.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc1_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc2_enabled:
+                    while proc2_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc2.get_nowait()
+                        try:  returned_record = q_proc2.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc2_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc3_enabled:
+                    while proc3_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc3.get_nowait()
+                        try:  returned_record = q_proc3.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc3_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc4_enabled:
+                    while proc4_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc4.get_nowait()
+                        try:  returned_record = q_proc4.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc4_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc5_enabled:
+                    while proc5_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc5.get_nowait()
+                        try:  returned_record = q_proc5.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc5_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc6_enabled:
+                    while proc6_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc6.get_nowait()
+                        try:  returned_record = q_proc6.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc6_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc7_enabled:
+                    while proc7_write_count != 0  and  current_write_count  !=  0:
+                        ###  try:  returned_record = q_proc7.get_nowait()
+                        try:  returned_record = q_proc7.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc7_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+                if flag_proc8_enabled:
+                    while proc8_write_count != 0  and  current_write_count  !=  0:
+                        ### try:  returned_record = q_proc8.get_nowait()
+                        try:  returned_record = q_proc8.get(timeout=0.1)
+                        except Empty:
+                            break
+                        else:
+                            if 'ERROR '  in returned_record:
+                                # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                                print returned_record
+                                sys.exit(1)
+                            elif 'DEBUG '  in returned_record:
+                                print returned_record
+                            else:
+                                #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                                #  and temporarily place it in a list for further processing
+                                proc8_write_count -= 1
+                                current_write_count -= 1
+                                list_of_records.append(returned_record.rstrip('\r|\n'))
+
+                    if current_write_count  ==  0:
+                        #  All of the subprocess are waiting for more slices to process
+                        flag_waiting_to_read = False
+                        break
+
+
+    #  Clean up at the end, now check on the subprocesses that are processing the last slices
+    #
+    if flag_CalculateChecksum:
+        waiting_on_last_slices_to_calculate_processing_start_time = time.time()
+        if debug_on:
+            print 'Waiting on the checksum calculations of the last slices...\n'
+
+    elif flag_CreateSlice:
+        waiting_on_last_slices_to_create_processing_start_time = time.time()
+        if debug_on:
+            print 'Waiting on the last slices to be created...\n'
+
+    if debug_on:
+        remaining_to_process = proc1_write_count + proc2_write_count + proc3_write_count + proc4_write_count + proc5_write_count + proc6_write_count + proc7_write_count + proc8_write_count
+        print 'Debug it:   current_write_count (' + str(current_write_count) + ') and the number of outstanding slices to be process (' + str(remaining_to_process) + ')\n'
+
+
+    while current_write_count  >  0:
+        if flag_proc1_enabled:
+            while proc1_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc1.get_nowait()
+                try:  returned_record = q_proc1.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc1_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc2_enabled:
+            while proc2_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc2.get_nowait()
+                try:  returned_record = q_proc2.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc2_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc3_enabled:
+            while proc3_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc3.get_nowait()
+                try:  returned_record = q_proc3.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc3_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc4_enabled:
+            while proc4_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc4.get_nowait()
+                try:  returned_record = q_proc4.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc4_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc5_enabled:
+            while proc5_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc5.get_nowait()
+                try:  returned_record = q_proc5.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc5_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc6_enabled:
+            while proc6_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc6.get_nowait()
+                try:  returned_record = q_proc6.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc6_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc7_enabled:
+            while proc7_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc7.get_nowait()
+                try:  returned_record = q_proc7.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc7_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if flag_proc8_enabled:
+            while proc8_write_count != 0  and  current_write_count  !=  0:
+                ###  try:  returned_record = q_proc8.get_nowait()
+                try:  returned_record = q_proc8.get(timeout=0.1)
+                except Empty:
+                    break
+                else:
+                    if 'ERROR '  in returned_record:
+                        # On an error condition from trying to create the slice,  an error message is passed back via: "record"
+                        print returned_record
+                        sys.exit(1)
+                    elif 'DEBUG '  in returned_record:
+                        print returned_record
+                    else:
+                        #  Take the database record that was passed back from the subprocess  CreateSlice.py
+                        #  and temporarily place it in a list for further processing
+                        proc8_write_count -= 1
+                        current_write_count -= 1
+                        list_of_records.append(returned_record.rstrip('\r|\n'))
+
+            if current_write_count  ==  0:
+                #  All of the subprocess are waiting for more slices to process
+                break
+
+        if current_write_count  >  0:
+            #  Verify that that there are still subprocess that we suspect still are processing the last slice(s)
+            #  this is like a fail safe so we don't end up looping forever
+            remaining_to_be_read = proc1_write_count + proc2_write_count + proc3_write_count + proc4_write_count + proc5_write_count + proc6_write_count + proc7_write_count + proc8_write_count
+            if remaining_to_be_read  !=  current_write_count:
+                print 'ERROR:  stuck in endless loop mismatch between  current_write_count (' + str(current_write_count) + ') and the number of outstanding slices to be read (' + str(remaining_to_be_read) + ')\n'
+                sys.exit(1)
+            else:
+                #  Go sleep and and then check the subprocesses again
+                time.sleep(0.2)
+
+
+    #  Clean up at the end, process the last of the created database records in the stack
+    #
+    while len(list_of_records)  !=  0:
+        returned_record = list_of_records.pop(0)
+        record = returned_record.split(' :: ')
+
+        if flag_CalculateChecksum:
+            sha1_value = record[0]
+            md5_value = record[1]
+            slice_file_size = int(record[2])
+            slice_offset = int(record[3])
+            slice_number = int(record[4])
+
+            #  Yes the checksum_key is going to be a very long string varying between 84 and 86 characters
+            #      SHA1 - 40 characters     MD5 - 32 characters     Slice length - between 4 and 6 digits     Two delimiters - 8 charactes
+            checksum_key = sha1_value + ' :: ' + md5_value + ' :: ' + str(slice_file_size)
+            temp_slice_record = checksum_key + ' :: ' + str(slice_offset)
+            slice_list = []
+
+            if checksum_2_slice_numbers.has_key(checksum_key):
+                duplicate_checksum_keyed_by_slice_number[int(slice_number)] = str(temp_slice_record)
+                slice_list = checksum_2_slice_numbers.get(checksum_key)
+            else:
+                unique_checksum_keyed_by_slice_number[int(slice_number)] = str(temp_slice_record)
+
+            slice_list.append(str(slice_number))
+            checksum_2_slice_numbers[checksum_key] = slice_list
+        elif flag_CreateSlice:
+            sha1_value = record[0]
+            md5_value = record[1]
+            slice_file_size = int(record[2])
+            encrypted_file_size = int(record[3])
+            slice_file_block_cnt = int(record[4])
+            encrypted_file_block_cnt = int(record[5])
+            slice_offset = int(record[6])
+            slice_number = int(record[7])
+            status = record[8]
+            slice_name = record[9]
+
+            #  Create a record for the slice that was just processed to be placed into the database for this vos dump 
+            checksum_key = sha1_value + ' :: ' + md5_value + ' :: ' + str(slice_file_size)
+
+            if file_annotation.has_key(str(slice_offset)):
+                returned_record = returned_record + ' :: ' + str(file_annotation[str(slice_offset)])
+
+            was_created_keyed_by_slice_number[slice_number] = returned_record
+
+            #  Create the initial record within the all slice database for this newly created slice 
+            link_count = 1
+            part_1 = str(encrypted_file_size) + ' :: ' + str(slice_file_block_cnt) + ' :: ' + str(encrypted_file_block_cnt)
+            db_record = part_1 + ' :: ' + slice_name + ' :: ' + str(link_count)
+
+            was_created_keyed_by_checksum[checksum_key] = db_record
+
+
+    #  Send a STOP message to all the subprocesses
+    #
+    if flag_CalculateChecksum:
+        stop_CalculateChecksum_processing_start_time = time.time()
+        if debug_on:
+            print 'Send STOP message to the  CalculateSliceChecksum  subprocesses...\n'        
+    elif flag_CreateSlice:
+        stop_CreateSlice_processing_start_time = time.time()
+        if debug_on:
+            print 'Send STOP message to the  CreateSlice  subprocesses...\n'
+
+    stop_message = 'STOP\n'
+
+    if flag_proc1_enabled:
+        slicer_proc1.stdin.write(stop_message)
+        slicer_proc1.stdin.flush()
+    if flag_proc2_enabled:
+        slicer_proc2.stdin.write(stop_message)
+        slicer_proc2.stdin.flush()
+    if flag_proc3_enabled:
+        slicer_proc3.stdin.write(stop_message)
+        slicer_proc3.stdin.flush()
+    if flag_proc4_enabled:
+        slicer_proc4.stdin.write(stop_message)
+        slicer_proc4.stdin.flush()
+    if flag_proc5_enabled:
+        slicer_proc5.stdin.write(stop_message)
+        slicer_proc5.stdin.flush()
+    if flag_proc6_enabled:
+        slicer_proc6.stdin.write(stop_message)
+        slicer_proc6.stdin.flush()
+    if flag_proc7_enabled:
+        slicer_proc7.stdin.write(stop_message)
+        slicer_proc7.stdin.flush()
+    if flag_proc8_enabled:
+        slicer_proc8.stdin.write(stop_message)
+        slicer_proc8.stdin.flush()
+
+
